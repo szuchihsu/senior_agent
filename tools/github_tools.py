@@ -11,9 +11,41 @@ The Data Collection Agent calls these functions to:
   3. Get the CI test results for each commit
 """
 
+import re
 import requests
 from datetime import datetime
 from config import GITHUB_TOKEN, TARGET_REPO
+
+
+# ── Flaky / infrastructure job filter ────────────────────────────────────────
+
+# Job names matching any of these patterns are excluded from tests_run and
+# tests_failed. These are CI infrastructure jobs whose failures are unrelated
+# to code changes (link rot, dependency bots, platform flakiness, etc.).
+# Add patterns here if you notice noise in your evaluation results.
+FLAKY_JOB_PATTERNS = [
+    r"dependabot",
+    r"doc.?check",
+    r"link.?check",
+    r"check.?link",
+    r"spell.?check",
+    r"label",
+    r"stale",
+    r"lock",
+    r"auto.?assign",
+    r"greet",
+    r"welcome",
+    r"triage",
+    r"windows.*pypy",
+    r"pypy.*windows",
+]
+
+_flaky_re = re.compile("|".join(FLAKY_JOB_PATTERNS), re.IGNORECASE)
+
+
+def _is_flaky_job(job_name: str) -> bool:
+    """Returns True if the job name matches a known flaky/infra pattern."""
+    return bool(_flaky_re.search(job_name))
 
 
 # ── Base HTTP helper ──────────────────────────────────────────────────────────
@@ -177,6 +209,12 @@ def get_test_results_for_commit(repo: str, commit_sha: str) -> dict:
 
         for job in jobs_data.get("jobs", []):
             job_name = job["name"]
+
+            # Skip infrastructure/flaky jobs — their failures aren't caused
+            # by code changes and would pollute the training signal
+            if _is_flaky_job(job_name):
+                continue
+
             tests_run.append(job_name)
 
             # A job "failed" if its conclusion is failure or cancelled
