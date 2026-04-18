@@ -31,6 +31,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from agents.data_collection import load_records
+from agents.noise_detector import load_blocklist, apply_blocklist
 from agents import retrieval, ranking
 from tools.vector_tools import get_collection_size
 from config import TARGET_REPO, TOP_K_SIMILAR, TOP_N_TESTS_TO_REPORT
@@ -105,6 +106,11 @@ def evaluate(
     if not all_records:
         print("No records found. Run data_collection.run() first.")
         return EvalSummary()
+
+    # Apply noise blocklist so evaluation metrics aren't skewed by infra jobs
+    blocklist = load_blocklist(repo)
+    if blocklist:
+        all_records = apply_blocklist(all_records, blocklist)
 
     # Only evaluate on commits that had at least one test failure
     # (commits where nothing failed aren't interesting to evaluate)

@@ -31,6 +31,7 @@ from datetime import datetime
 from models.schemas import DiffRecord
 from tools.vector_tools import store_diff_record, get_collection_size
 from agents.data_collection import load_records
+from agents.noise_detector import load_blocklist, apply_blocklist
 from config import TARGET_REPO
 
 
@@ -107,6 +108,11 @@ def run(repo: str = None, force_reembed: bool = False) -> int:
     if not records:
         print("[Embedding] No records to embed. Run data_collection.run() first.")
         return 0
+
+    # Apply noise blocklist if one exists for this repo
+    blocklist = load_blocklist(repo)
+    if blocklist:
+        records = apply_blocklist(records, blocklist)
 
     current_db_size = get_collection_size()
     print(f"[Embedding] Vector DB currently has {current_db_size} records")
