@@ -18,10 +18,10 @@ in similar ways — which suggests they might break similar tests.
 from tools.diff_tools import clean_diff
 from tools.vector_tools import query_similar_diffs, get_collection_size
 from agents.embedding import embed_query
-from config import TOP_K_SIMILAR
+from config import TOP_K_SIMILAR, TARGET_REPO
 
 
-def run(diff_text: str, top_k: int = None) -> list[dict]:
+def run(diff_text: str, top_k: int = None, repo: str = None) -> list[dict]:
     """
     Main entry point for the Retrieval Agent.
 
@@ -50,8 +50,9 @@ def run(diff_text: str, top_k: int = None) -> list[dict]:
         # → 15 historical diffs most similar to my_pr.diff
     """
     top_k = top_k or TOP_K_SIMILAR
+    repo = repo or TARGET_REPO
 
-    db_size = get_collection_size()
+    db_size = get_collection_size(repo)
     if db_size == 0:
         print("[Retrieval] Vector DB is empty. Run embedding.run() first.")
         return []
@@ -71,7 +72,7 @@ def run(diff_text: str, top_k: int = None) -> list[dict]:
     query_vector = embed_query(cleaned_diff)
 
     # Step 3: Query ChromaDB for the top_k most similar embeddings
-    similar_diffs = query_similar_diffs(query_vector, top_k=top_k)
+    similar_diffs = query_similar_diffs(query_vector, top_k=top_k, repo=repo)
 
     print(f"[Retrieval] Found {len(similar_diffs)} similar diffs")
 

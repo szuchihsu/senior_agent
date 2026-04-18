@@ -136,7 +136,7 @@ def evaluate(
         all_tests = set(record["tests_run"])
 
         # Run the predictor pipeline (skip explanation — it calls Claude and we want speed)
-        similar_diffs = retrieval.run(record["diff_text"], top_k=top_k)
+        similar_diffs = retrieval.run(record["diff_text"], top_k=top_k, repo=repo)
 
         # Exclude the commit being evaluated from the similar diffs
         # (otherwise we'd be "cheating" by finding the exact same commit)

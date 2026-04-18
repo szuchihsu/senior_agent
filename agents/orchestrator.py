@@ -25,10 +25,10 @@ from datetime import datetime, timezone
 from models.schemas import PredictionReport
 from tools.vector_tools import get_collection_size
 from agents import retrieval, ranking, explanation
-from config import TOP_K_SIMILAR, TOP_N_TESTS_TO_REPORT
+from config import TOP_K_SIMILAR, TOP_N_TESTS_TO_REPORT, TARGET_REPO
 
 
-def predict(diff_text: str, top_k: int = None, top_n: int = None) -> PredictionReport:
+def predict(diff_text: str, top_k: int = None, top_n: int = None, repo: str = None) -> PredictionReport:
     """
     Main entry point: given a diff, predict which tests are most likely to fail.
 
@@ -57,13 +57,14 @@ def predict(diff_text: str, top_k: int = None, top_n: int = None) -> PredictionR
     """
     top_k = top_k or TOP_K_SIMILAR
     top_n = top_n or TOP_N_TESTS_TO_REPORT
+    repo = repo or TARGET_REPO
 
     print("\n" + "="*60)
     print("REGRESSION PREDICTOR — Analyzing diff...")
     print("="*60)
 
     # Sanity check: make sure we have data to search against
-    db_size = get_collection_size()
+    db_size = get_collection_size(repo)
     if db_size == 0:
         print("[Orchestrator] ERROR: Vector DB is empty.")
         print("[Orchestrator] Run: python main.py build")
@@ -74,7 +75,7 @@ def predict(diff_text: str, top_k: int = None, top_n: int = None) -> PredictionR
     # ── Step 1: Retrieval ──────────────────────────────────────────────────────
     # Find the most similar historical diffs
     print("\n[Orchestrator] Step 1/3: Retrieving similar historical diffs...")
-    similar_diffs = retrieval.run(diff_text, top_k=top_k)
+    similar_diffs = retrieval.run(diff_text, top_k=top_k, repo=repo)
 
     if not similar_diffs:
         print("[Orchestrator] No similar diffs found. Cannot make predictions.")

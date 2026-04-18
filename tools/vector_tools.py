@@ -18,7 +18,7 @@ import json
 import chromadb
 from chromadb.config import Settings
 from models.schemas import DiffRecord
-from config import VECTOR_DB_DIR
+from config import VECTOR_DB_DIR, TARGET_REPO
 
 
 # ── Client setup ──────────────────────────────────────────────────────────────
@@ -39,12 +39,28 @@ def get_chroma_client() -> chromadb.PersistentClient:
     )
 
 
-def get_or_create_collection(client: chromadb.PersistentClient) -> chromadb.Collection:
+def _repo_to_collection_name(repo: str) -> str:
     """
-    Gets or creates the 'diffs' collection in ChromaDB.
+    Converts a repo string to a valid ChromaDB collection name.
+
+    ChromaDB collection names must be 3-63 chars, alphanumeric + hyphens/underscores.
+    "pallets/flask" → "pallets_flask"
+    """
+    return repo.replace("/", "_").replace("-", "_").lower()
+
+
+def get_or_create_collection(
+    client: chromadb.PersistentClient,
+    repo: str = None,
+) -> chromadb.Collection:
+    """
+    Gets or creates a per-repo collection in ChromaDB.
+
+    Each repo gets its own isolated collection so diffs from
+    pallets/flask never pollute predictions for psf/requests.
 
     A "collection" is like a table in a SQL database — it groups
-    related embeddings together. We use one collection for all diffs.
+    related embeddings together.
 
     The collection stores:
       - embeddings: the float vectors
@@ -52,10 +68,11 @@ def get_or_create_collection(client: chromadb.PersistentClient) -> chromadb.Coll
       - metadatas: structured data (commit SHA, failed tests, etc.)
 
     Returns:
-        The ChromaDB collection object.
+        The ChromaDB collection object for this repo.
     """
+    collection_name = _repo_to_collection_name(repo or TARGET_REPO)
     return client.get_or_create_collection(
-        name="diffs",
+        name=collection_name,
         # cosine similarity is better than euclidean distance for text embeddings
         # because it measures the angle between vectors, not their magnitude
         metadata={"hnsw:space": "cosine"}
@@ -64,7 +81,7 @@ def get_or_create_collection(client: chromadb.PersistentClient) -> chromadb.Coll
 
 # ── Storage ───────────────────────────────────────────────────────────────────
 
-def store_diff_record(record: DiffRecord) -> None:
+def store_diff_record(record: DiffRecord, repo: str = None) -> None:
     """
     Stores a single DiffRecord in the vector database.
 
@@ -81,7 +98,7 @@ def store_diff_record(record: DiffRecord) -> None:
         record: A DiffRecord with embedding already computed.
     """
     client = get_chroma_client()
-    collection = get_or_create_collection(client)
+    collection = get_or_create_collection(client, repo)
 
     collection.add(
         ids=[record.commit_sha],
@@ -97,7 +114,7 @@ def store_diff_record(record: DiffRecord) -> None:
     )
 
 
-def query_similar_diffs(query_embedding: list[float], top_k: int = 20) -> list[dict]:
+def query_similar_diffs(query_embedding: list[float], top_k: int = 20, repo: str = None) -> list[dict]:
     """
     Finds the most similar historical diffs to a query embedding.
 
@@ -122,7 +139,7 @@ def query_similar_diffs(query_embedding: list[float], top_k: int = 20) -> list[d
         Sorted from most similar to least similar.
     """
     client = get_chroma_client()
-    collection = get_or_create_collection(client)
+    collection = get_or_create_collection(client, repo)
 
     if collection.count() == 0:
         return []  # no data yet
@@ -155,8 +172,8 @@ def query_similar_diffs(query_embedding: list[float], top_k: int = 20) -> list[d
     return similar_diffs
 
 
-def get_collection_size() -> int:
-    """Returns how many diffs are currently stored in the vector DB."""
+def get_collection_size(repo: str = None) -> int:
+    """Returns how many diffs are currently stored in the vector DB for a repo."""
     client = get_chroma_client()
-    collection = get_or_create_collection(client)
+    collection = get_or_create_collection(client, repo)
     return collection.count()

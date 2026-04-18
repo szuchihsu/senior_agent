@@ -91,7 +91,7 @@ def cmd_predict(args):
         sys.exit(1)
 
     # Run the full prediction pipeline
-    report = predict(diff_text, top_n=args.top_n)
+    report = predict(diff_text, top_n=args.top_n, repo=args.repo)
 
     # Optionally save the report to a JSON file
     if args.output:
@@ -123,6 +123,8 @@ def main():
                                 help="Read diff from stdin (pipe from git)")
     predict_parser.add_argument("--top-n", type=int, default=TOP_N_TESTS_TO_REPORT,
                                 help=f"Number of tests to show (default: {TOP_N_TESTS_TO_REPORT})")
+    predict_parser.add_argument("--repo", default=TARGET_REPO,
+                                help=f"GitHub repo to predict for (default: {TARGET_REPO})")
     predict_parser.add_argument("--output", type=str,
                                 help="Save report as JSON to this file path")
     predict_parser.set_defaults(func=cmd_predict)

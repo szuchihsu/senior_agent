@@ -114,7 +114,7 @@ def run(repo: str = None, force_reembed: bool = False) -> int:
     if blocklist:
         records = apply_blocklist(records, blocklist)
 
-    current_db_size = get_collection_size()
+    current_db_size = get_collection_size(repo)
     print(f"[Embedding] Vector DB currently has {current_db_size} records")
 
     embedded_count = 0
@@ -139,15 +139,15 @@ def run(repo: str = None, force_reembed: bool = False) -> int:
                 pr_number=record.get("pr_number"),
             )
 
-            # Store in ChromaDB
+            # Store in ChromaDB — use repo-specific collection
             # ChromaDB will skip duplicates if the same ID is added twice
-            store_diff_record(diff_record)
+            store_diff_record(diff_record, repo)
             embedded_count += 1
 
         except Exception as e:
             print(f"[Embedding]   Error embedding {sha[:8]}: {e}")
             continue
 
-    new_db_size = get_collection_size()
+    new_db_size = get_collection_size(repo)
     print(f"[Embedding] Done. Embedded {embedded_count} records. DB now has {new_db_size} entries.")
     return embedded_count
