@@ -23,7 +23,7 @@ import argparse
 import subprocess
 import sys
 
-from agents import data_collection, embedding
+from agents import data_collection, embedding, noise_detector
 from agents.orchestrator import predict
 from config import TARGET_REPO, MAX_COMMITS_TO_COLLECT, TOP_N_TESTS_TO_REPORT
 
@@ -36,10 +36,13 @@ def cmd_build(args):
     you're collecting and how fast the GitHub API responds.
     """
     print(f"Building vector index for {args.repo}...")
-    print(f"Step 1/2: Collecting CI history ({args.max_commits} commits)...")
+    print(f"Step 1/3: Collecting CI history ({args.max_commits} commits)...")
     data_collection.run(repo=args.repo, max_commits=args.max_commits)
 
-    print("\nStep 2/2: Embedding diffs and storing in vector DB...")
+    print("\nStep 2/3: Detecting and filtering noisy CI jobs...")
+    noise_detector.run(repo=args.repo)
+
+    print("\nStep 3/3: Embedding diffs and storing in vector DB...")
     count = embedding.run(repo=args.repo)
 
     print(f"\nBuild complete. {count} diffs embedded and indexed.")
