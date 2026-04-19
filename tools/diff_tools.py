@@ -94,6 +94,24 @@ def clean_diff(raw_diff: str, max_chars: int = 8000) -> str:
     # Truncate if too long — take the first max_chars characters
     # This keeps the most important (usually top-of-file) changes
     if len(result) > max_chars:
+        truncated_files = [
+            re.search(r"diff --git a/(.+?) b/", s).group(1)
+            for s in cleaned_sections
+            if re.search(r"diff --git a/(.+?) b/", s)
+        ]
+        # Find which files got cut off by counting chars up to the limit
+        chars = 0
+        cutoff_idx = 0
+        for i, s in enumerate(cleaned_sections):
+            chars += len(s) + 1  # +1 for the \n join
+            if chars > max_chars:
+                cutoff_idx = i
+                break
+        kept = truncated_files[:cutoff_idx] if cutoff_idx else truncated_files
+        dropped = truncated_files[cutoff_idx:] if cutoff_idx else []
+        if dropped:
+            print(f"[DiffTools] Warning: diff truncated at {max_chars} chars. "
+                  f"Dropped {len(dropped)} file(s): {', '.join(dropped)}")
         result = result[:max_chars] + "\n... (truncated)"
 
     return result
